@@ -36,7 +36,7 @@ st.markdown(
 )
 
 # Carregar dados da planilha
-xlsx_path = "/Users/avasconcellos/alvaro/proj_carbono/projetos_info_verra.xlsx"
+xlsx_path = "projetos_info_verra.xlsx"
 df = pd.read_excel(xlsx_path)
 
 # Converter a coluna de datas
