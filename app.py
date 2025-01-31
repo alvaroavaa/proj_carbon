@@ -111,7 +111,7 @@ m = folium.Map(location=[-3.0, -60.0], zoom_start=4, tiles="OpenStreetMap")
 
 for index, row in filtered_df.iterrows():
     project_id = str(row["Program Registartion Number"])
-    kml_path = f"/Users/avasconcellos/alvaro/proj_carbono/{project_id}.kml"
+    kml_path = f"{project_id}.kml"
     if os.path.exists(kml_path):
         coordenadas_list = carregar_coordenadas_kml(kml_path)
         tooltip_info = row["Nome do projeto"]
