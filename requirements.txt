@@ -4,3 +4,4 @@ openpyxl
 folium
 streamlit-folium
 plotly
+lxml  # Necessária para parsing XML mais robusto (recomendada em vez do módulo padrão ElementTree)
