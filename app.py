@@ -1,49 +1,32 @@
 import streamlit as st
 import pandas as pd
-import folium
 from streamlit_folium import st_folium
-import os
-from xml.etree import ElementTree as ET
+from mapa_projetos import plotar_mapa
+from graficos_projetos import plotar_graficos
 from datetime import datetime
-import plotly.express as px
+import os
 
-# Configuração do layout do Streamlit
+# Configuração do layout
 st.set_page_config(page_title="Dashboard de Projetos de Carbono", layout="wide")
 
-# Estilização customizada
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: #FFFFFF;
-        color: #2E8B57;
-        font-family: 'Arial', sans-serif;
-    }
-    .main {
-        background-color: #FFFFFF;
-        color: #2E8B57;
-    }
-    h1, h2, h3 {
-        color: #2E8B57;
-    }
-    .sidebar .sidebar-content {
-        background-color: #E3F6E3;
-        color: #2E8B57;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # Carregar dados da planilha
-xlsx_path = "projetos_info_verra.xlsx"
+xlsx_path = "/Users/avasconcellos/alvaro/proj_carbono/projetos_info_verra_020225.xlsx"
 df = pd.read_excel(xlsx_path)
 
-# Converter a coluna de datas
-df["Data da última verificaçao"] = pd.to_datetime(df["Data da última verificaçao"], errors='coerce')
-df["Data de termino"] = pd.to_datetime(df["Data de termino"], errors='coerce')
+# Preprocessamento de dados
+df = df[df["Program Registartion Number"].notna()]
+df["Program Registartion Number"] = df["Program Registartion Number"].apply(lambda x: str(int(x)).strip())
+df["Data da última verificaçao"] = pd.to_datetime(df["Data da última verificaçao"], format="%d/%m/%Y", errors='coerce')
+df["Data de termino"] = pd.to_datetime(df["Data de termino"], format="%d/%m/%Y", errors='coerce')
 
-# ** Filtros condicionais **
+# Listar arquivos KML disponíveis
+kml_directory = "/Users/avasconcellos/alvaro/proj_carbono"
+kml_files = {f.split(".")[0] for f in os.listdir(kml_directory) if f.endswith(".kml")}
+
+# Filtrar projetos com arquivos KML correspondentes
+df = df[df["Program Registartion Number"].isin(kml_files)]
+
+# **Filtros no Sidebar**
 with st.sidebar.expander("Filtros", expanded=True):
     # Filtro 1: Estado
     estado_filter = st.multiselect("Filtrar por Estado", options=df["State"].unique(), default=[])
@@ -85,96 +68,23 @@ with st.sidebar.expander("Filtros", expanded=True):
     rating_filter = st.multiselect("Filtrar por Nota das Empresas de Rating", options=rating_options, default=[])
     filtered_df = filtered_df[filtered_df["Nota da agencia de rating"].isin(rating_filter)] if rating_filter else filtered_df
 
-# Função para carregar coordenadas do KML
-def carregar_coordenadas_kml(kml_path):
-    try:
-        tree = ET.parse(kml_path)
-        root = tree.getroot()
-        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
-        coordenadas_list = []
-        placemarks = root.findall(".//kml:Placemark", ns)
-        for placemark in placemarks:
-            coords = placemark.find(".//kml:coordinates", ns)
-            if coords is not None:
-                coordenadas = coords.text.strip().split()
-                pontos = [(float(coord.split(",")[1]), float(coord.split(",")[0])) for coord in coordenadas]
-                if pontos:
-                    coordenadas_list.append(pontos)
-        return coordenadas_list
-    except Exception as e:
-        st.warning(f"Erro ao carregar o arquivo KML {kml_path}: {e}")
-        return []
+# **Função Cacheada para o Mapa**
+@st.cache_resource
+def gerar_mapa(filtered_df, kml_directory):
+    return plotar_mapa(filtered_df, kml_directory)
 
-# Mapa interativo
+# **Mapa**
 st.header("Mapa dos Projetos de Carbono")
-m = folium.Map(location=[-3.0, -60.0], zoom_start=4, tiles="OpenStreetMap")
+mapa, cores_projetos = gerar_mapa(filtered_df, kml_directory)
 
-for index, row in filtered_df.iterrows():
-    project_id = str(row["Program Registartion Number"])
-    kml_path = f"{project_id}.kml"
-    if os.path.exists(kml_path):
-        coordenadas_list = carregar_coordenadas_kml(kml_path)
-        tooltip_info = row["Nome do projeto"]
-        for coordenadas in coordenadas_list:
-            folium.Polygon(
-                locations=coordenadas,
-                color="#2E8B57",
-                weight=3,
-                fill=True,
-                fill_color="#B0EACD",
-                fill_opacity=0.6,
-                tooltip=folium.Tooltip(tooltip_info, sticky=True)
-            ).add_to(m)
+# Exibir o mapa sem loop
+with st.container():
+    st_folium(mapa, width=1200, height=750)
 
-st_folium(m, width=1200, height=750)
+# **Legenda**
+st.subheader("Legenda dos Projetos")
+for projeto, cor in cores_projetos.items():
+    st.markdown(f'<span style="background-color:{cor}; width:20px; height:20px; display:inline-block; margin-right:10px;"></span> {projeto}', unsafe_allow_html=True)
 
 # **Gráficos**
-st.header("Gráficos dos Projetos Filtrados")
-
-# Gráfico 1: Pizza com Nome do Projeto x Área do Projeto
-fig_pizza = px.pie(
-    filtered_df,
-    names="Nome do projeto",
-    values="Área Total",
-    title="Distribuição da Área por Projeto",
-    height=500,
-    color_discrete_sequence=["#2E8B57", "#6AB187", "#A1DAB4", "#76C2AF"]
-)
-st.plotly_chart(fig_pizza, use_container_width=True)
-
-# Gráfico 2: Barras horizontais
-filtered_df_termino = filtered_df[filtered_df["Data de termino"].notna()]
-filtered_df_termino["Ano de termino"] = filtered_df_termino["Data de termino"].dt.year
-
-fig_termino = px.bar(
-    filtered_df_termino.sort_values("Ano de termino"),
-    x="Ano de termino",
-    y="Nome do projeto",
-    title="Ano de Término dos Projetos",
-    labels={"Nome do projeto": "Projeto", "Ano de termino": "Ano de Término"},
-    orientation="h",
-    height=600,
-    color_discrete_sequence=["#2E8B57"]
-)
-fig_termino.update_traces(
-    text=filtered_df_termino["Ano de termino"],
-    textposition="outside"
-)
-
-st.plotly_chart(fig_termino, use_container_width=True)
-
-# Gráfico 3: Nome do Projeto x Créditos de Carbono Gerados
-fig_creditos = px.bar(
-    filtered_df,
-    x="Nome do projeto",
-    y="Geraçao média anual estimada (tCO2-eq/ha/ano)",
-    title="Quantidade de Créditos Gerados por Projeto",
-    labels={"Nome do projeto": "Projeto", "Geraçao média anual estimada (tCO2-eq/ha/ano)": "Créditos Gerados (tCO2-eq/ha/ano)"},
-    height=500,
-    color_discrete_sequence=["#76C2AF"]
-)
-st.plotly_chart(fig_creditos, use_container_width=True)
-
-# Exibição da tabela filtrada
-st.header("Tabela de Projetos Filtrados")
-st.dataframe(filtered_df)
+plotar_graficos(filtered_df)
