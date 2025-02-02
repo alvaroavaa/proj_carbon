@@ -20,7 +20,7 @@ df["Data da última verificaçao"] = pd.to_datetime(df["Data da última verifica
 df["Data de termino"] = pd.to_datetime(df["Data de termino"], format="%d/%m/%Y", errors='coerce')
 
 # Listar arquivos KML disponíveis
-kml_directory = "/kmls"
+kml_directory = "."
 kml_files = {f.split(".")[0] for f in os.listdir(kml_directory) if f.endswith(".kml")}
 
 # Filtrar projetos com arquivos KML correspondentes
