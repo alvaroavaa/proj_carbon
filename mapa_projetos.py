@@ -29,9 +29,9 @@ def carregar_coordenadas_kml(kml_path):
         return coordenadas_list if coordenadas_list else None
 
     except Exception as e:
+        st.warning(f"Erro ao carregar o arquivo KML {kml_path}: {e}")
         return None
 
-# Cache do mapa
 @st.cache_resource
 def plotar_mapa(df, kml_directory):
     projetos_unicos = df["Nome do projeto"].unique()
@@ -46,16 +46,24 @@ def plotar_mapa(df, kml_directory):
         kml_path = os.path.join(kml_directory, f"{project_id}.kml")
 
         coordenadas_list = carregar_coordenadas_kml(kml_path)
+
         if coordenadas_list:
-            for coordenadas in coordenadas_list:
-                folium.Polygon(
-                    locations=coordenadas,
-                    color=cor_projeto,
-                    weight=3,
-                    fill=True,
-                    fill_color=cor_projeto,
-                    fill_opacity=0.6,
-                    tooltip=nome_projeto
-                ).add_to(m)
+            # Adicionar apenas coordenadas válidas
+            coordenadas_validas = [coords for coords in coordenadas_list if coords]
+            if coordenadas_validas:
+                for coordenadas in coordenadas_validas:
+                    folium.Polygon(
+                        locations=coordenadas,
+                        color=cor_projeto,
+                        weight=3,
+                        fill=True,
+                        fill_color=cor_projeto,
+                        fill_opacity=0.6,
+                        tooltip=nome_projeto
+                    ).add_to(m)
+            else:
+                st.warning(f"KML sem coordenadas válidas: {kml_path}")
+        else:
+            st.warning(f"Erro ao carregar ou KML vazio: {kml_path}")
 
     return m, cores_projetos
