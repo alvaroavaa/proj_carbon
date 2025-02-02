@@ -10,7 +10,7 @@ import os
 st.set_page_config(page_title="Dashboard de Projetos de Carbono", layout="wide")
 
 # Carregar dados da planilha
-xlsx_path = "/Users/avasconcellos/alvaro/proj_carbono/projetos_info_verra_020225.xlsx"
+xlsx_path = "projetos_info_verra_020225.xlsx"
 df = pd.read_excel(xlsx_path)
 
 # Preprocessamento de dados
@@ -20,7 +20,7 @@ df["Data da última verificaçao"] = pd.to_datetime(df["Data da última verifica
 df["Data de termino"] = pd.to_datetime(df["Data de termino"], format="%d/%m/%Y", errors='coerce')
 
 # Listar arquivos KML disponíveis
-kml_directory = "/Users/avasconcellos/alvaro/proj_carbono"
+kml_directory = "proj_carbono"
 kml_files = {f.split(".")[0] for f in os.listdir(kml_directory) if f.endswith(".kml")}
 
 # Filtrar projetos com arquivos KML correspondentes
